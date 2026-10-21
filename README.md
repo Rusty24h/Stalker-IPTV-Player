@@ -11,10 +11,6 @@ A high-performance, hardware-accelerated IPTV client engineered specifically for
 
 Designed as a modern, lightweight, and customizable replacement for legacy set-top box middleware, it provides a native **10-foot remote-controlled television interface** with complete Stalker / Ministra portal integration, seamless EPG timelines, catch-up TV archives, multi-season VOD series management, multi-audio/subtitle track picker, and a built-in local background streaming proxy service.
 
-<p align="center">
-  <img src="public/tizen/icon.png" width="180" alt="SmartSTB Clone App Icon" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);" />
-</p>
-
 ---
 
 ## Table of Contents
