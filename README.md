@@ -128,8 +128,7 @@ Before installing the app on your Samsung Smart TV, ensure you have:
 
 ### Phase 2: Install Tizen Studio & TV Extension
 
-1. Download and install **Tizen Studio** (with IDE or CLI) from the official Samsung Developer portal:
-   👉 [Samsung Developers: Tizen Studio Download](https://developer.samsung.com/smarttv/develop/tools/tizen-studio/download.html)
+1. Download and install **Tizen Studio** (with IDE or CLI) from the official Samsung Developer portal.
 2. Launch **Tizen Package Manager**:
    - Under the **Main SDK** tab, install **Tizen SDK Tools**.
    - Under the **Extension SDK** tab, install:
