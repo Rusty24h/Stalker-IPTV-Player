@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080, initial-scale=1.0, user-scalable=no" />
+    <title>SmartSTB Clone</title>
+    <script type="text/javascript" src="$WEBAPIS/webapis/webapis.js"></script>
+    <link rel="stylesheet" type="text/css" href="css/style.css" />
+<script src="/_aistudio-iframe.js?v=6634132a"></script></head>
+<body class="theme-blue">
+    <!-- Hardware Video Surface -->
+    <object id="av-player" type="application/avplayer"></object>
+
+    <!-- Subtitle Overlay -->
+    <div id="subtitle-box"></div>
+
+    <!-- Background Service Unreachable Banner -->
+    <div id="service-banner">Local Proxy Service Unreachable — Check service/proxy.js</div>
+
+    <!-- Main UI Overlay -->
+    <div id="ui-overlay">
+        <div id="top-bar">
+            <div id="top-left">
+                <div id="app-brand">SMART STB</div>
+                <div id="profile-badge">⚡ Default</div>
+                <span id="account-exp-badge" class="account-exp-badge"></span>
+                <div id="filter-badge"></div>
+                <div id="sleep-timer-badge"></div>
+            </div>
+            <div id="clock-display">--:--</div>
+        </div>
+
+        <div id="cols-wrap">
+            <!-- Column 0: Modes -->
+            <div id="col-modes" class="col focused">
+                <div class="col-header">MAIN MENU</div>
+                <div id="modes-list" class="col-list"></div>
+            </div>
+
+            <!-- Column 1: Categories -->
+            <div id="col-cats" class="col">
+                <div id="cats-header" class="col-header">CATEGORIES</div>
+                <div id="cats-list" class="col-list"></div>
+            </div>
+
+            <!-- Column 2: Channels / VOD / Series -->
+            <div id="col-items" class="col">
+                <div id="items-header" class="col-header">CHANNELS</div>
+                <div id="items-list" class="col-list"></div>
+            </div>
+
+            <!-- Column 3: Rich Preview & EPG -->
+            <div id="col-info" class="col">
+                <div class="col-header">DETAILS &amp; EPG</div>
+                <div id="preview-poster-wrap">
+                    <img id="preview-poster" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Poster" />
+                </div>
+                <div id="preview-title">Select an item</div>
+                <div id="preview-meta"></div>
+                <div id="preview-epg-progress-wrap" class="preview-epg-bar-wrap">
+                    <div id="preview-epg-progress-fill" class="preview-epg-bar-fill"></div>
+                </div>
+                <div id="preview-desc">Navigate with Left/Right/Up/Down arrows and press OK to play.</div>
+                <div id="preview-quick-actions" class="quick-action-bar"></div>
+            </div>
+        </div>
+
+        <div id="help-bar">
+            <div class="key-hints">
+                <span><i class="dot red"></i> Sort / Audio</span>
+                <span><i class="dot green"></i> Search / Aspect</span>
+                <span><i class="dot yellow"></i> Fav / Pin Cat</span>
+                <span><i class="dot blue"></i> Filter / Subs</span>
+            </div>
+            <div>OK: Play / Mini-Zap &bull; RIGHT on Item: Quick Actions &bull; GUIDE/INFO: Full EPG &bull; 0: Recall &bull; RETURN: Back</div>
+        </div>
+    </div>
+
+    <!-- Direct Channel Number Entry Display -->
+    <div id="num-osd"></div>
+
+    <!-- Fullscreen Quick Channel Zapper Drawer -->
+    <div id="mini-zap-drawer">
+        <div id="mini-zap-header">
+            <span id="mini-zap-title">Quick Channel Switcher</span>
+            <span id="mini-zap-sub">LIVE</span>
+        </div>
+        <div id="mini-zap-list" class="col-list"></div>
+        <div id="mini-zap-footer">UP/DOWN: Select &bull; OK: Switch Channel &bull; GUIDE: Full 4-Col Guide &bull; BACK: Close</div>
+    </div>
+
+    <!-- Interactive Audio & Subtitle Track Picker Modal -->
+    <div id="tracks-modal">
+        <div id="tracks-modal-box">
+            <div id="tracks-modal-title">Audio &amp; Subtitle Tracks</div>
+            <div id="tracks-modal-subtitle">Select a stream track</div>
+            <div id="tracks-list" class="col-list"></div>
+            <div id="tracks-style-bar">
+                <span id="tracks-style-color">Color: White</span>
+                <span id="tracks-style-size">Size: Normal (38px)</span>
+            </div>
+            <div id="tracks-modal-hint">UP/DOWN: Select &bull; OK: Activate Track &bull; LEFT/RIGHT: Subtitle Style &bull; BACK: Close</div>
+        </div>
+    </div>
+
+    <!-- Bottom Playback OSD Bar -->
+    <div id="osd-bar">
+        <div id="osd-header">
+            <div id="osd-title">Channel Name</div>
+            <div id="osd-right-meta">
+                <div id="osd-tech-badges"></div>
+                <div id="osd-status">LIVE</div>
+            </div>
+        </div>
+        <div class="epg-row"><span>NOW:</span><b id="epg-now">Loading EPG...</b></div>
+        <div class="epg-row"><span>NEXT:</span><b id="epg-next">Loading EPG...</b></div>
+        <div id="vod-progress-wrap">
+            <div id="vod-progress-bar"></div>
+            <div id="vod-seek-marker"></div>
+        </div>
+        <div id="vod-time-row">
+            <span id="vod-time-cur">00:00</span>
+            <span id="vod-seek-preview"></span>
+            <span id="vod-time-dur">00:00</span>
+        </div>
+    </div>
+
+    <!-- Auto-Play Next Episode Banner -->
+    <div id="next-ep-banner">
+        <div id="next-ep-title">Next Episode Starting Soon...</div>
+        <div id="next-ep-sub">Press OK to Play Now &bull; Press BACK to Cancel</div>
+    </div>
+
+    <!-- Settings & Multi-Portal Profile Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-box">
+            <h2>Portal &amp; Profile Settings</h2>
+            <div class="modal-row">
+                <div>
+                    <label for="sel-profile">Active Portal Profile</label>
+                    <select id="sel-profile"></select>
+                </div>
+                <div>
+                    <label for="inp-profile-name">Profile Name</label>
+                    <input id="inp-profile-name" type="text" placeholder="Living Room IPTV" />
+                </div>
+            </div>
+            <label for="inp-portal">Stalker Portal URL</label>
+            <input id="inp-portal" type="text" placeholder="http://example.com/stalker_portal/c/" />
+            <label for="inp-mac">MAC Address</label>
+            <input id="inp-mac" type="text" placeholder="00:1A:79:XX:XX:XX" />
+            <div class="modal-row">
+                <div>
+                    <label for="sel-theme">UI Color Theme</label>
+                    <select id="sel-theme">
+                        <option value="blue">Classic Blue</option>
+                        <option value="green">Emerald Green</option>
+                        <option value="red">Crimson Red</option>
+                        <option value="amber">Gold Amber</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="inp-pin">Parental Control PIN (4 Digits)</label>
+                    <input id="inp-pin" type="password" maxlength="4" placeholder="0000" />
+                </div>
+            </div>
+            <div class="btn-row">
+                <div id="btn-save" class="btn">Save &amp; Connect</div>
+                <div id="btn-profile-new" class="btn">New Profile</div>
+                <div id="btn-profile-del" class="btn">Delete Profile</div>
+                <div id="btn-backup-export" class="btn">Export Backup</div>
+                <div id="btn-backup-import" class="btn">Import Backup</div>
+                <div id="btn-restart" class="btn">Clear Cache &amp; Reload</div>
+                <div id="btn-cancel" class="btn">Cancel</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Search Modal -->
+    <div id="search-modal" class="modal">
+        <div class="modal-box">
+            <h2>Global Search (Live, Movies &amp; Series)</h2>
+            <label for="inp-search">Search Keyword</label>
+            <input id="inp-search" type="text" placeholder="Type title and press Enter..." />
+            <div id="search-results" class="col-list"></div>
+        </div>
+    </div>
+
+    <!-- Column Filter Modal -->
+    <div id="filter-modal" class="modal">
+        <div class="modal-box">
+            <h2 id="filter-modal-title">Filter List</h2>
+            <label for="inp-filter">Filter Keyword</label>
+            <input id="inp-filter" type="text" placeholder="Type keyword to filter current column..." />
+            <div class="btn-row">
+                <div id="btn-filter-apply" class="btn">Apply Filter</div>
+                <div id="btn-filter-clear" class="btn">Clear Filter</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Full EPG Timeline & Catch-Up Archive Modal -->
+    <div id="epg-modal" class="modal">
+        <div class="modal-box wide">
+            <h2 id="epg-modal-title">Channel EPG Guide</h2>
+            <div id="epg-modal-body">
+                <div id="epg-modal-list" class="col-list"></div>
+                <div id="epg-modal-info">
+                    <div id="epg-modal-prog-title">Select a program</div>
+                    <div id="epg-modal-prog-time"></div>
+                    <div id="epg-modal-desc">Program details and Catch-Up archive availability appear here.</div>
+                    <div id="epg-modal-hint">UP/DOWN: Select Program &bull; OK: Play Catch-Up / Switch to Live &bull; BACK: Close</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Parental PIN Verification Modal -->
+    <div id="pin-modal" class="modal">
+        <div class="modal-box">
+            <h2>Parental Control</h2>
+            <label for="inp-pin-verify">Enter 4-Digit Parental PIN (Use Remote Numbers 0-9 or OK)</label>
+            <input id="inp-pin-verify" type="password" maxlength="4" placeholder="****" />
+            <div id="pin-status-msg"></div>
+            <div class="btn-row">
+                <div id="btn-pin-unlock" class="btn">Unlock</div>
+                <div id="btn-pin-cancel" class="btn">Cancel</div>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript" src="app.js"></script>
+</body>
+</html>
