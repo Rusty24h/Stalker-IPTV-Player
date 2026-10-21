@@ -239,9 +239,6 @@ tizen run -s <TV_DEVICE_ID> -p smartstbv2.SmartSTBclone
 ### Q: "Categories couldn't load" or connection error on cold boot?
 **A**: Some Stalker portals enforce a token handshake delay. SmartSTB v2 automatically retries authentication up to 16 times in the background. If your portal changed domains, click **⚡ Default** (top bar) to open Settings and verify your Portal URL and MAC.
 
-### Q: Audio plays fine on TV, but is silent on PC?
-**A**: Samsung Smart TVs have built-in hardware DSP licenses for Dolby Digital (`AC-3` / `E-AC-3`). Standard PC browsers (Chrome/Edge) do not decode AC-3 natively without transcoding. If using the companion PC version, run `pc-server.js` with `ffmpeg` installed to enable automatic on-the-fly AAC transcoding.
-
 ### Q: How do I backup my settings and channel favorites?
 **A**: Open **Settings** > Click **Export Backup**. The app stores a complete encrypted snapshot to TV storage and local proxy memory, which can be restored anytime via **Import Backup**.
 
