@@ -105,7 +105,7 @@ The embedded background service runs locally on the TV at `http://127.0.0.1:3001
 
 Before installing the app on your Samsung Smart TV, ensure you have:
 1. **Samsung Smart TV** running Tizen OS 4.0 or newer (Manufactured from 2018 onwards).
-2. **PC / Mac / Linux** on the **same local Wi-Fi or Ethernet network** as your TV.
+2. **Windows / Mac / Linux** on the **same local Wi-Fi or Ethernet network** as your TV.
 3. **Samsung Remote Control** (Standard IR remote with numeric keypad or Smart Remote).
 4. **Active Stalker Portal URL** and an activated **MAC Address** (format: `00:1A:79:XX:XX:XX`).
 
