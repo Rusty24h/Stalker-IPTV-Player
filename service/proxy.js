@@ -16,6 +16,7 @@ var BACKUP_FILE_PATH = '/tmp/smartstb_backup.json';
 var endpointCache = {};
 var cookieJar = {};
 var lastPortalReferer = '';
+var lastActiveMac = '';
 var memoryBackupJson = '';
 var activeVideoUpReq = null;
 var MAG_UA = 'Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3';
@@ -70,12 +71,18 @@ function extendHeaders(baseObj, extraObj) {
     return out;
 }
 
-function storeSetCookies(hostname, setCookieHeaders) {
+function getCookieScopeKey(hostname, mac) {
+    var cleanMac = String(mac || lastActiveMac || '').trim().toUpperCase();
+    return cleanMac ? (hostname + '|' + cleanMac) : hostname;
+}
+
+function storeSetCookies(hostname, setCookieHeaders, mac) {
     if (!hostname || !setCookieHeaders) {
         return;
     }
-    if (!cookieJar[hostname]) {
-        cookieJar[hostname] = {};
+    var scopeKey = getCookieScopeKey(hostname, mac);
+    if (!cookieJar[scopeKey]) {
+        cookieJar[scopeKey] = {};
     }
     var list = Array.isArray(setCookieHeaders) ? setCookieHeaders : [setCookieHeaders];
     for (var i = 0; i < list.length; i++) {
@@ -86,14 +93,15 @@ function storeSetCookies(hostname, setCookieHeaders) {
             var name = firstPart.substring(0, eqIdx).trim();
             var val = firstPart.substring(eqIdx + 1).trim();
             if (name) {
-                cookieJar[hostname][name] = val;
+                cookieJar[scopeKey][name] = val;
             }
         }
     }
 }
 
-function getHostCookieHeader(hostname, baseCookie) {
-    var jarCookies = cookieJar[hostname] || {};
+function getHostCookieHeader(hostname, baseCookie, mac) {
+    var scopeKey = getCookieScopeKey(hostname, mac);
+    var jarCookies = cookieJar[scopeKey] || {};
     var pairs = [];
     if (baseCookie) {
         pairs.push(baseCookie);
@@ -129,11 +137,13 @@ function decodeBufferByEncoding(rawBuf, encoding, callback) {
     }
 }
 
-function normalizePortalKey(rawPortal) {
-    return (rawPortal || '').trim().replace(/\/+$/, '').toLowerCase();
+function normalizePortalKey(rawPortal, mac) {
+    var baseKey = (rawPortal || '').trim().replace(/\/+$/, '').toLowerCase();
+    var cleanMac = String(mac || '').trim().toUpperCase();
+    return cleanMac ? (baseKey + '|' + cleanMac) : baseKey;
 }
 
-function getCandidateUrls(rawPortal, search) {
+function getCandidateUrls(rawPortal, search, mac) {
     var clean = (rawPortal || '').trim().replace(/\/+$/, '');
     if (clean.indexOf('http://') !== 0 && clean.indexOf('https://') !== 0) {
         clean = 'http://' + clean;
@@ -142,7 +152,7 @@ function getCandidateUrls(rawPortal, search) {
     if (qs && qs.charAt(0) !== '?') {
         qs = '?' + qs.replace(/^\/+/, '');
     }
-    var portalKey = normalizePortalKey(rawPortal);
+    var portalKey = normalizePortalKey(rawPortal, mac);
     var list = [];
     if (clean.indexOf('.php') !== -1) {
         list.push(clean + qs);
@@ -196,6 +206,7 @@ function getReferer(rawPortal) {
 
 function requestWithFallback(reqState, callback) {
     var portalKey = reqState.portalKey;
+    var mac = reqState.mac || '';
     var candidates = reqState.candidates;
     var idx = reqState.idx || 0;
     var headers = reqState.headers;
@@ -210,7 +221,7 @@ function requestWithFallback(reqState, callback) {
     var target = url.parse(currentUrl);
     var isHttps = target.protocol === 'https:';
     var client = isHttps ? https : http;
-    var mergedCookie = getHostCookieHeader(target.hostname, headers.Cookie || '');
+    var mergedCookie = getHostCookieHeader(target.hostname, headers.Cookie || '', mac);
     var reqHeaders = extendHeaders(headers, {
         Host: target.host,
         Cookie: mergedCookie,
@@ -235,6 +246,7 @@ function requestWithFallback(reqState, callback) {
         if (!useFreshSocket) {
             requestWithFallback({
                 portalKey: portalKey,
+                mac: mac,
                 candidates: candidates,
                 idx: idx,
                 headers: headers,
@@ -245,6 +257,7 @@ function requestWithFallback(reqState, callback) {
         }
         requestWithFallback({
             portalKey: portalKey,
+            mac: mac,
             candidates: candidates,
             idx: idx + 1,
             headers: headers,
@@ -253,7 +266,7 @@ function requestWithFallback(reqState, callback) {
         }, callback);
     }
     var proxyReq = client.request(options, function(proxyRes) {
-        storeSetCookies(target.hostname, proxyRes.headers['set-cookie']);
+        storeSetCookies(target.hostname, proxyRes.headers['set-cookie'], mac);
         var status = proxyRes.statusCode;
         if ((status === 301 || status === 302 || status === 303 || status === 307 || status === 308) &&
             proxyRes.headers.location && redirectsLeft > 0) {
@@ -267,6 +280,7 @@ function requestWithFallback(reqState, callback) {
             redirectedList[idx] = nextUrl;
             requestWithFallback({
                 portalKey: portalKey,
+                mac: mac,
                 candidates: redirectedList,
                 idx: idx,
                 headers: headers,
@@ -534,6 +548,28 @@ function startProxyServer(port) {
         if (parsedUrl.pathname === '/catalog-cache') {
             var profKey = String((parsedUrl.query && parsedUrl.query.profile) || 'default').replace(/[^a-zA-Z0-9_-]/g, '');
             var cacheFilePath = '/tmp/smartstb_catalog_' + profKey + '.json';
+            if (parsedUrl.query && parsedUrl.query.action === 'delete') {
+                var delMac = String(parsedUrl.query.mac || '').trim().toUpperCase();
+                if (delMac) {
+                    var ckKeys = Object.keys(cookieJar);
+                    for (var cki = 0; cki < ckKeys.length; cki++) {
+                        if (ckKeys[cki].indexOf('|' + delMac) !== -1) {
+                            delete cookieJar[ckKeys[cki]];
+                        }
+                    }
+                    var epKeys = Object.keys(endpointCache);
+                    for (var epi = 0; epi < epKeys.length; epi++) {
+                        if (epKeys[epi].indexOf('|' + delMac) !== -1) {
+                            delete endpointCache[epKeys[epi]];
+                        }
+                    }
+                }
+                fs.unlink(cacheFilePath, function() {
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ status: 'deleted', profile: profKey }));
+                });
+                return;
+            }
             if (req.method === 'POST') {
                 var catParts = [];
                 var totalBytes = 0;
@@ -595,9 +631,10 @@ function startProxyServer(port) {
         var mac = safeDecodeURIComponent(rawMac).trim();
         var portal = safeDecodeURIComponent(rawPortal).trim();
         var tz = safeDecodeURIComponent(rawTz).trim() || 'UTC';
-        var portalKey = normalizePortalKey(portal);
+        var portalKey = normalizePortalKey(portal, mac);
         var refererUrl = getReferer(portal);
         lastPortalReferer = refererUrl;
+        lastActiveMac = mac;
         var headers = {
             'User-Agent': MAG_UA,
             'X-User-Agent': 'Model: MAG250; Link: WiFi',
@@ -610,9 +647,10 @@ function startProxyServer(port) {
         if (rawToken) {
             headers.Authorization = 'Bearer ' + safeDecodeURIComponent(rawToken).trim();
         }
-        var candidates = getCandidateUrls(portal, targetSearch);
+        var candidates = getCandidateUrls(portal, targetSearch, mac);
         requestWithFallback({
             portalKey: portalKey,
+            mac: mac,
             candidates: candidates,
             idx: 0,
             headers: headers,
