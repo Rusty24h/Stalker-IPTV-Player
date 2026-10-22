@@ -37,10 +37,10 @@ body {
     text-shadow:
         0 2px 4px rgba(0, 0, 0, 0.98),
         0 0 10px rgba(0, 0, 0, 0.92),
-        -1px -1px 2px rgba(0, 0, 0, 0.98),
-        1px -1px 2px rgba(0, 0, 0, 0.98),
-        -1px 1px 2px rgba(0, 0, 0, 0.98),
-        1px 1px 2px rgba(0, 0, 0, 0.98);
+        -2px -2px 0 rgba(0, 0, 0, 0.98),
+        2px -2px 0 rgba(0, 0, 0, 0.98),
+        -2px 2px 0 rgba(0, 0, 0, 0.98),
+        2px 2px 0 rgba(0, 0, 0, 0.98);
     padding: 0;
     z-index: 45;
     pointer-events: none;
@@ -50,6 +50,14 @@ body {
 #subtitle-box.visible {
     display: block;
 }
+#subtitle-box.sub-color-white { color: #ffffff !important; }
+#subtitle-box.sub-color-yellow { color: #fde047 !important; }
+#subtitle-box.sub-color-cyan { color: #67e8f9 !important; }
+#subtitle-box.sub-color-green { color: #4ade80 !important; }
+#subtitle-box.sub-color-magenta { color: #f472b6 !important; }
+#subtitle-box.sub-size-normal { font-size: 34px !important; }
+#subtitle-box.sub-size-large { font-size: 44px !important; }
+#subtitle-box.sub-size-xl { font-size: 54px !important; }
 /* Service / Diagnostic Banner */
 #service-banner {
     position: absolute;
@@ -860,7 +868,10 @@ body.theme-green .col-header,
 body.theme-green #preview-meta,
 body.theme-green .epg-row span,
 body.theme-green #next-ep-sub,
-body.theme-green #epg-modal-prog-time {
+body.theme-green #epg-modal-prog-time,
+body.theme-green #mini-zap-header,
+body.theme-green #tracks-modal-subtitle,
+body.theme-green .item-epg-sub {
     color: #34d399;
 }
 body.theme-green #smartstb-toast,
@@ -869,7 +880,9 @@ body.theme-green #next-ep-banner,
 body.theme-green #filter-badge,
 body.theme-green #profile-badge:hover,
 body.theme-green .modal-box input.focused,
-body.theme-green .modal-box select.focused {
+body.theme-green .modal-box select.focused,
+body.theme-green #mini-zap-drawer,
+body.theme-green #tracks-modal-box {
     border-color: #10b981;
 }
 body.theme-green .col.focused {
@@ -881,12 +894,16 @@ body.theme-green #osd-status,
 body.theme-green #vod-progress-bar,
 body.theme-green .col.focused .item.selected::before,
 body.theme-green #search-results .item.selected::before,
-body.theme-green #epg-modal-list .item.selected::before {
+body.theme-green #epg-modal-list .item.selected::before,
+body.theme-green #mini-zap-list .item.selected::before,
+body.theme-green #tracks-list .item.selected::before {
     background: #10b981;
 }
 body.theme-green .col.focused .item.selected,
 body.theme-green #search-results .item.selected,
-body.theme-green #epg-modal-list .item.selected {
+body.theme-green #epg-modal-list .item.selected,
+body.theme-green #mini-zap-list .item.selected,
+body.theme-green #tracks-list .item.selected {
     background: linear-gradient(90deg, rgba(16, 185, 129, 0.32) 0%, rgba(255, 255, 255, 0.04) 100%);
     border-color: #10b981;
 }
@@ -896,7 +913,9 @@ body.theme-green .quick-action-pill.focused {
     background: #10b981;
     border-color: #34d399;
 }
-body.theme-green .preview-epg-bar-fill {
+body.theme-green .preview-epg-bar-fill,
+body.theme-green .osd-epg-bar-fill,
+body.theme-green .item-progress-fill {
     background: linear-gradient(90deg, #10b981, #34d399);
 }
 
@@ -905,7 +924,10 @@ body.theme-red .col-header,
 body.theme-red #preview-meta,
 body.theme-red .epg-row span,
 body.theme-red #next-ep-sub,
-body.theme-red #epg-modal-prog-time {
+body.theme-red #epg-modal-prog-time,
+body.theme-red #mini-zap-header,
+body.theme-red #tracks-modal-subtitle,
+body.theme-red .item-epg-sub {
     color: #f87171;
 }
 body.theme-red #smartstb-toast,
@@ -914,7 +936,9 @@ body.theme-red #next-ep-banner,
 body.theme-red #filter-badge,
 body.theme-red #profile-badge:hover,
 body.theme-red .modal-box input.focused,
-body.theme-red .modal-box select.focused {
+body.theme-red .modal-box select.focused,
+body.theme-red #mini-zap-drawer,
+body.theme-red #tracks-modal-box {
     border-color: #ef4444;
 }
 body.theme-red .col.focused {
@@ -926,12 +950,16 @@ body.theme-red #osd-status,
 body.theme-red #vod-progress-bar,
 body.theme-red .col.focused .item.selected::before,
 body.theme-red #search-results .item.selected::before,
-body.theme-red #epg-modal-list .item.selected::before {
+body.theme-red #epg-modal-list .item.selected::before,
+body.theme-red #mini-zap-list .item.selected::before,
+body.theme-red #tracks-list .item.selected::before {
     background: #ef4444;
 }
 body.theme-red .col.focused .item.selected,
 body.theme-red #search-results .item.selected,
-body.theme-red #epg-modal-list .item.selected {
+body.theme-red #epg-modal-list .item.selected,
+body.theme-red #mini-zap-list .item.selected,
+body.theme-red #tracks-list .item.selected {
     background: linear-gradient(90deg, rgba(239, 68, 68, 0.32) 0%, rgba(255, 255, 255, 0.04) 100%);
     border-color: #ef4444;
 }
@@ -941,7 +969,9 @@ body.theme-red .quick-action-pill.focused {
     background: #ef4444;
     border-color: #f87171;
 }
-body.theme-red .preview-epg-bar-fill {
+body.theme-red .preview-epg-bar-fill,
+body.theme-red .osd-epg-bar-fill,
+body.theme-red .item-progress-fill {
     background: linear-gradient(90deg, #ef4444, #f87171);
 }
 
@@ -950,7 +980,10 @@ body.theme-amber .col-header,
 body.theme-amber #preview-meta,
 body.theme-amber .epg-row span,
 body.theme-amber #next-ep-sub,
-body.theme-amber #epg-modal-prog-time {
+body.theme-amber #epg-modal-prog-time,
+body.theme-amber #mini-zap-header,
+body.theme-amber #tracks-modal-subtitle,
+body.theme-amber .item-epg-sub {
     color: #fbbf24;
 }
 body.theme-amber #smartstb-toast,
@@ -959,7 +992,9 @@ body.theme-amber #next-ep-banner,
 body.theme-amber #filter-badge,
 body.theme-amber #profile-badge:hover,
 body.theme-amber .modal-box input.focused,
-body.theme-amber .modal-box select.focused {
+body.theme-amber .modal-box select.focused,
+body.theme-amber #mini-zap-drawer,
+body.theme-amber #tracks-modal-box {
     border-color: #f59e0b;
 }
 body.theme-amber .col.focused {
@@ -971,12 +1006,16 @@ body.theme-amber #osd-status,
 body.theme-amber #vod-progress-bar,
 body.theme-amber .col.focused .item.selected::before,
 body.theme-amber #search-results .item.selected::before,
-body.theme-amber #epg-modal-list .item.selected::before {
+body.theme-amber #epg-modal-list .item.selected::before,
+body.theme-amber #mini-zap-list .item.selected::before,
+body.theme-amber #tracks-list .item.selected::before {
     background: #f59e0b;
 }
 body.theme-amber .col.focused .item.selected,
 body.theme-amber #search-results .item.selected,
-body.theme-amber #epg-modal-list .item.selected {
+body.theme-amber #epg-modal-list .item.selected,
+body.theme-amber #mini-zap-list .item.selected,
+body.theme-amber #tracks-list .item.selected {
     background: linear-gradient(90deg, rgba(245, 158, 11, 0.32) 0%, rgba(255, 255, 255, 0.04) 100%);
     border-color: #f59e0b;
 }
@@ -986,7 +1025,9 @@ body.theme-amber .quick-action-pill.focused {
     background: #f59e0b;
     border-color: #fbbf24;
 }
-body.theme-amber .preview-epg-bar-fill {
+body.theme-amber .preview-epg-bar-fill,
+body.theme-amber .osd-epg-bar-fill,
+body.theme-amber .item-progress-fill {
     background: linear-gradient(90deg, #f59e0b, #fbbf24);
 }
 
@@ -1019,6 +1060,45 @@ body.theme-amber .preview-epg-bar-fill {
 .item.playing .item-label {
     color: #6ee7b7;
     font-weight: bold;
+}
+
+/* Channel Logo Fallback Placeholder Badge */
+.item-logo-placeholder {
+    width: 42px;
+    height: 30px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #9ca3af;
+    font-size: 12px;
+    font-weight: bold;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px;
+    flex-shrink: 0;
+    letter-spacing: 0.5px;
+}
+
+/* Live EPG Progress Bar inside Fullscreen OSD */
+.osd-epg-bar-wrap {
+    width: 100%;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 5px 0 3px 0;
+    display: none;
+}
+.osd-epg-bar-wrap.visible {
+    display: block;
+}
+.osd-epg-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #3b82f6, #60a5fa);
+    border-radius: 3px;
+    transition: width 0.25s ease;
 }
 
 /* Sleep Timer Badge in Top Bar */
@@ -1143,6 +1223,22 @@ body.theme-amber .preview-epg-bar-fill {
     flex: 1;
     overflow: hidden;
     position: relative;
+}
+#mini-zap-list .item.selected,
+#tracks-list .item.selected {
+    background: linear-gradient(90deg, rgba(37, 99, 235, 0.34) 0%, rgba(255, 255, 255, 0.04) 100%);
+    border-color: #3b82f6;
+}
+#mini-zap-list .item.selected::before,
+#tracks-list .item.selected::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 18%;
+    bottom: 18%;
+    width: 4px;
+    border-radius: 4px;
+    background: #3b82f6;
 }
 #mini-zap-footer {
     font-size: 17px;
