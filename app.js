@@ -72,6 +72,10 @@
     var exitConfirmTimeout = null;
     var hasAutoResumedOnBoot = false;
     var shortEpgCache = {};
+    var shortEpgKeys = [];
+    var fullEpgCache = {};
+    var seriesLoading = false;
+    var lastKeyRepeatTime = 0;
     var favLiveCache = null;
     var favVodCache = null;
     var favSeriesCache = null;
@@ -192,6 +196,8 @@
     var osdTechBadgesEl = document.getElementById('osd-tech-badges');
     var epgNow = document.getElementById('epg-now');
     var epgNext = document.getElementById('epg-next');
+    var osdEpgProgressWrap = document.getElementById('osd-epg-progress-wrap');
+    var osdEpgProgressFill = document.getElementById('osd-epg-progress-fill');
     var vodProgressWrap = document.getElementById('vod-progress-wrap');
     var vodProgressBar = document.getElementById('vod-progress-bar');
     var vodSeekMarker = document.getElementById('vod-seek-marker');
@@ -267,8 +273,8 @@
         [inpPortalEl].filter(Boolean),
         [inpMacEl].filter(Boolean),
         [selThemeEl, inpPinEl].filter(Boolean),
-        [btnSaveEl, btnProfileNewEl, btnProfileDelEl, btnRestartEl, btnCancelEl].filter(Boolean),
-        [btnBackupExportEl, btnBackupImportEl].filter(Boolean)
+        [btnSaveEl, btnProfileNewEl, btnProfileDelEl, btnCancelEl].filter(Boolean),
+        [btnBackupExportEl, btnBackupImportEl, btnRestartEl].filter(Boolean)
     ].filter(function(r) { return r.length > 0; });
 
     var settingsEls = [
@@ -487,7 +493,7 @@
         if (rawScoped !== null) {
             return safeGetJson(scopedKey, fallback);
         }
-        if (activeProfileId === 'prof_default' || editingProfileIndex === 0) {
+        if (activeProfileId === 'prof_default') {
             var legacyVal = safeGetJson(baseKey, null);
             if (legacyVal !== null) {
                 safeSetStorage(scopedKey, JSON.stringify(legacyVal));
@@ -1325,6 +1331,18 @@
             return seasons;
         });
     };
+    function storeShortEpgEntry(key, list) {
+        if (!shortEpgCache[key]) {
+            shortEpgKeys.push(key);
+            if (shortEpgKeys.length > 250) {
+                var oldestKey = shortEpgKeys.shift();
+                if (oldestKey) {
+                    delete shortEpgCache[oldestKey];
+                }
+            }
+        }
+        shortEpgCache[key] = { ts: Date.now(), list: list };
+    }
     StalkerAPI.prototype.fetchShortEpg = function(channelId) {
         var key = String(channelId);
         var cached = shortEpgCache[key];
@@ -1343,21 +1361,31 @@
             } else if (res && Array.isArray(res.data)) {
                 list = res.data;
             }
-            shortEpgCache[key] = { ts: Date.now(), list: list };
+            storeShortEpgEntry(key, list);
             return list;
         }).catch(function() {
-            shortEpgCache[key] = { ts: Date.now(), list: [] };
+            storeShortEpgEntry(key, []);
             return [];
         });
     };
     StalkerAPI.prototype.fetchFullEpg = function(channelId) {
         var self = this;
+        var profScope = activeProfileId || 'prof_default';
+        var cachedFull = fullEpgCache[profScope];
+        if (cachedFull && (Date.now() - cachedFull.ts) < 600000 && cachedFull.map) {
+            if (Array.isArray(cachedFull.map[channelId]) && cachedFull.map[channelId].length > 0) {
+                return Promise.resolve(cachedFull.map[channelId]);
+            }
+        }
         return this.request({
             type: 'itv',
             action: 'get_epg_info',
             period: 24
         }).then(function(res) {
             var map = (res && res.data) ? res.data : res;
+            if (map && typeof map === 'object' && !Array.isArray(map)) {
+                fullEpgCache[profScope] = { ts: Date.now(), map: map };
+            }
             if (map && Array.isArray(map[channelId]) && map[channelId].length > 0) {
                 return map[channelId];
             }
@@ -2054,6 +2082,27 @@
         }
         return item.name;
     }
+    function updateOsdEpgProgressBar() {
+        if (!osdEpgProgressWrap || !osdEpgProgressFill) {
+            return;
+        }
+        if (isPlayingVod || isPlayingCatchup || !currentPlayingItem) {
+            osdEpgProgressWrap.classList.remove('visible');
+            osdEpgProgressFill.style.width = '0%';
+            return;
+        }
+        var cached = shortEpgCache[String(currentPlayingItem.id)];
+        if (cached && Array.isArray(cached.list) && cached.list.length > 0) {
+            var parsed = parseShortEpgNowNext(cached.list);
+            if (parsed.progressPct > 0) {
+                osdEpgProgressWrap.classList.add('visible');
+                osdEpgProgressFill.style.width = Math.min(100, Math.max(0, parsed.progressPct)) + '%';
+                return;
+            }
+        }
+        osdEpgProgressWrap.classList.remove('visible');
+        osdEpgProgressFill.style.width = '0%';
+    }
     function showOSD(title, status, nowText, nextText) {
         if (!osdBar) {
             return;
@@ -2070,6 +2119,7 @@
         if (nextText !== undefined && epgNext) {
             epgNext.textContent = nextText;
         }
+        updateOsdEpgProgressBar();
         var showVodBar = isPlayingVod || isPlayingCatchup;
         if (vodProgressWrap) {
             if (showVodBar) {
@@ -3361,7 +3411,12 @@
 
     function hideImgOnError(e) {
         var target = e && (e.currentTarget || e.target);
-        if (target && target.style) {
+        if (target && target.parentNode) {
+            var ph = document.createElement('span');
+            ph.className = 'item-logo-placeholder';
+            ph.textContent = 'TV';
+            target.parentNode.replaceChild(ph, target);
+        } else if (target && target.style) {
             target.style.display = 'none';
         }
     }
@@ -3386,8 +3441,8 @@
             numPill.textContent = entry.num;
             row.appendChild(numPill);
         }
-        if (container === itemsListEl && entry && entry.logo) {
-            var logoSrc = resolveLogoUrl(entry.logo);
+        if (container === itemsListEl && entry && !entry.isVod && !entry.isSeries && !entry.isSeason) {
+            var logoSrc = entry.logo ? resolveLogoUrl(entry.logo) : '';
             if (logoSrc) {
                 var img = document.createElement('img');
                 img.className = 'item-logo';
@@ -3396,6 +3451,11 @@
                 img.src = logoSrc;
                 img.onerror = hideImgOnError;
                 row.appendChild(img);
+            } else {
+                var logoPh = document.createElement('span');
+                logoPh.className = 'item-logo-placeholder';
+                logoPh.textContent = 'TV';
+                row.appendChild(logoPh);
             }
         }
         var curModeIdForRow = modes[modeIdx] ? modes[modeIdx].id : 'live';
@@ -4568,11 +4628,14 @@
         });
     }
     function stepIntoSeries(item) {
-        if (!item) {
+        if (!item || seriesLoading) {
             return;
         }
         if (item.isSeries && !item.isSeason && !item.isEpisode) {
+            seriesLoading = true;
+            showToast('Loading seasons for ' + item.name + '...');
             api.fetchSeriesSeasons(item).then(function(seasons) {
+                seriesLoading = false;
                 seriesStack.push({
                     rawItems: rawItems.slice(),
                     itemIdx: itemIdx,
@@ -4588,6 +4651,7 @@
                 applyColumnFilters();
                 renderUI();
             }).catch(function(err) {
+                seriesLoading = false;
                 showOSD(item.name, 'Failed to load seasons: ' + err.message);
             });
         } else if (item.isSeason) {
@@ -4616,7 +4680,32 @@
             });
             itemFilterText = '';
             rawItems = episodes;
-            itemIdx = 0;
+            var targetEpIdx = 0;
+            var lastWatchedIdx = -1;
+            var resumeEpIdx = -1;
+            var playingEpIdx = -1;
+            for (var eIdx = 0; eIdx < episodes.length; eIdx++) {
+                var epObj = episodes[eIdx];
+                if (currentPlayingItem && String(currentPlayingItem.id) === String(epObj.id)) {
+                    playingEpIdx = eIdx;
+                    break;
+                }
+                var epResume = getResumeInfo(epObj.id);
+                if (epResume && epResume.pos > 15) {
+                    resumeEpIdx = eIdx;
+                }
+                if (isItemWatched(epObj.id)) {
+                    lastWatchedIdx = eIdx;
+                }
+            }
+            if (playingEpIdx !== -1) {
+                targetEpIdx = playingEpIdx;
+            } else if (resumeEpIdx !== -1) {
+                targetEpIdx = resumeEpIdx;
+            } else if (lastWatchedIdx !== -1) {
+                targetEpIdx = Math.min(episodes.length - 1, lastWatchedIdx + 1);
+            }
+            itemIdx = targetEpIdx;
             if (itemsHeaderEl) {
                 itemsHeaderEl.textContent = item.name + ' — Episodes';
             }
@@ -4640,10 +4729,43 @@
         return true;
     }
 
-    function renderProfileSelectOptions() {
+    function saveCurrentInputsToEditingProfile() {
+        if (!profiles || editingProfileIndex < 0 || editingProfileIndex >= profiles.length) {
+            return;
+        }
+        var p = profiles[editingProfileIndex];
+        if (!p) {
+            return;
+        }
+        if (inpProfileNameEl && typeof inpProfileNameEl.value === 'string') {
+            p.name = inpProfileNameEl.value.trim() || ('Portal ' + (editingProfileIndex + 1));
+        }
+        if (inpPortalEl && typeof inpPortalEl.value === 'string') {
+            p.portal = inpPortalEl.value.trim();
+        }
+        if (inpMacEl && typeof inpMacEl.value === 'string') {
+            p.mac = inpMacEl.value.trim();
+        }
+    }
+
+    var isRenderingProfileOptions = false;
+    function renderProfileSelectOptions(force) {
         if (!selProfileEl) {
             return;
         }
+        var currentChildCount = selProfileEl.children.length;
+        if (!force && currentChildCount === profiles.length) {
+            for (var c = 0; c < profiles.length; c++) {
+                var optEl = selProfileEl.children[c];
+                if (optEl) {
+                    optEl.value = profiles[c].id;
+                    optEl.textContent = profiles[c].name + ' (' + (profiles[c].mac || 'No MAC') + ')';
+                }
+            }
+            selProfileEl.selectedIndex = editingProfileIndex;
+            return;
+        }
+        isRenderingProfileOptions = true;
         selProfileEl.innerHTML = '';
         for (var i = 0; i < profiles.length; i++) {
             var opt = document.createElement('option');
@@ -4654,11 +4776,15 @@
             }
             selProfileEl.appendChild(opt);
         }
+        selProfileEl.selectedIndex = editingProfileIndex;
+        isRenderingProfileOptions = false;
     }
-    function loadProfileIntoSettingsInputs(idx) {
+    function loadProfileIntoSettingsInputs(idx, syncDropdown) {
         editingProfileIndex = Math.max(0, Math.min(profiles.length - 1, idx));
         var p = profiles[editingProfileIndex];
-        renderProfileSelectOptions();
+        if (syncDropdown !== false) {
+            renderProfileSelectOptions(false);
+        }
         if (inpProfileNameEl) {
             inpProfileNameEl.value = p.name || '';
         }
@@ -4671,10 +4797,14 @@
     }
     if (selProfileEl) {
         selProfileEl.onchange = function() {
+            if (isRenderingProfileOptions) {
+                return;
+            }
             var selectedId = selProfileEl.value;
             for (var p = 0; p < profiles.length; p++) {
                 if (profiles[p].id === selectedId) {
-                    loadProfileIntoSettingsInputs(p);
+                    saveCurrentInputsToEditingProfile();
+                    loadProfileIntoSettingsInputs(p, false);
                     break;
                 }
             }
@@ -4712,7 +4842,8 @@
         settingsOpen = true;
         settingsRow = 0;
         settingsCol = 0;
-        loadProfileIntoSettingsInputs(editingProfileIndex);
+        renderProfileSelectOptions(true);
+        loadProfileIntoSettingsInputs(editingProfileIndex, true);
         if (selThemeEl) {
             selThemeEl.value = localStorage.getItem('cfg_theme') || 'blue';
         }
@@ -4750,6 +4881,7 @@
         }, 150);
     }
     function saveSettingsAndBoot() {
+        saveCurrentInputsToEditingProfile();
         var prof = profiles[editingProfileIndex];
         if (prof) {
             prof.name = (inpProfileNameEl && inpProfileNameEl.value.trim()) || 'Portal ' + (editingProfileIndex + 1);
@@ -4769,16 +4901,47 @@
         }
         window._parentalUnlocked = false;
         invalidateFavCaches();
-        try {
-            localStorage.removeItem('stalker_live');
-        } catch (ex) {}
         closeSettings();
-        rebootApp();
+        stopPlayback();
+        currentPlayingItem = null;
+        previousLiveChannel = null;
+        hasAutoResumedOnBoot = false;
+        liveGenres = [];
+        allChannels = [];
+        vodCats = [];
+        seriesCats = [];
+        rawCats = [];
+        rawItems = [];
+        currentCats = [];
+        currentItems = [];
+        seriesStack = [];
+        shortEpgCache = {};
+        shortEpgKeys = [];
+        fullEpgCache = {};
+        rebuildGenreChannelCounts();
+        api.token = '';
+        api.handshakePromise = null;
+        api.authPromise = null;
+        if (accountBadgeEl) {
+            accountBadgeEl.textContent = 'Connecting...';
+        }
+        showToast('⚡ Connecting to ' + (prof ? prof.name : 'Portal') + '...');
+        renderUI();
+        wakeLocalService().then(function() {
+            return api.boot();
+        }).then(function() {
+            switchMode(0);
+        }).catch(function(err) {
+            showOSD('Connection Error', err.message);
+            showToast('⚠ Connection failed: ' + err.message);
+        });
     }
     function createNewProfileInSettings() {
-        var newId = 'prof_' + Date.now();
+        saveCurrentInputsToEditingProfile();
+        var newId = 'prof_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
         profiles.push({ id: newId, name: 'Portal ' + (profiles.length + 1), portal: 'http://', mac: '00:1A:79:00:00:01' });
-        loadProfileIntoSettingsInputs(profiles.length - 1);
+        renderProfileSelectOptions(true);
+        loadProfileIntoSettingsInputs(profiles.length - 1, true);
         showToast('Created Profile: Portal ' + profiles.length);
     }
     function deleteCurrentProfileInSettings() {
@@ -4787,13 +4950,54 @@
             showToast('Cannot delete the only profile');
             return;
         }
+        var deletedProf = profiles[editingProfileIndex] || null;
+        var deletedId = deletedProf ? deletedProf.id : null;
+        var deletedMac = deletedProf ? (deletedProf.mac || '') : '';
         profiles.splice(editingProfileIndex, 1);
         editingProfileIndex = Math.max(0, editingProfileIndex - 1);
         activeProfileId = profiles[editingProfileIndex].id;
         safeSetStorage('cfg_profiles', JSON.stringify(profiles));
         syncActiveProfileToLegacyKeys(profiles[editingProfileIndex]);
-        loadProfileIntoSettingsInputs(editingProfileIndex);
-        showToast('Profile deleted');
+        if (deletedId) {
+            try {
+                var scopedPrefixes = [
+                    'fav_live_', 'fav_vod_objs_', 'fav_series_objs_',
+                    'rec_items_', 'rec_vod_', 'vod_resume_', 'vod_watched_',
+                    'last_live_', 'pinned_cats_live_', 'pinned_cats_vod_', 'pinned_cats_series_'
+                ];
+                for (var sp = 0; sp < scopedPrefixes.length; sp++) {
+                    localStorage.removeItem(scopedPrefixes[sp] + deletedId);
+                }
+                if (deletedId === 'prof_default') {
+                    var legacyBaseKeys = ['fav_live', 'fav_vod_objs', 'fav_series_objs', 'rec_items', 'rec_vod', 'vod_resume', 'vod_watched', 'last_live'];
+                    for (var lb = 0; lb < legacyBaseKeys.length; lb++) {
+                        localStorage.removeItem(legacyBaseKeys[lb]);
+                    }
+                }
+                var liveSnap = safeGetJson('stalker_live', null);
+                if (liveSnap && liveSnap.profileId === deletedId) {
+                    localStorage.removeItem('stalker_live');
+                }
+                var keysToRemove = [];
+                for (var k = 0; k < localStorage.length; k++) {
+                    var kName = localStorage.key(k);
+                    if (kName && (kName.indexOf(deletedId) !== -1 || kName.indexOf('_' + deletedId) !== -1)) {
+                        keysToRemove.push(kName);
+                    }
+                }
+                for (var r = 0; r < keysToRemove.length; r++) {
+                    localStorage.removeItem(keysToRemove[r]);
+                }
+            } catch (exClean) {}
+            delete fullEpgCache[deletedId];
+            fetch(api.proxyUrl + '/catalog-cache?profile=' + encodeURIComponent(deletedId) + '&action=delete&mac=' + encodeURIComponent(deletedMac), {
+                method: 'GET'
+            }).catch(function() {});
+        }
+        invalidateFavCaches();
+        renderProfileSelectOptions(true);
+        loadProfileIntoSettingsInputs(editingProfileIndex, true);
+        showToast('🗑 Profile & cached data deleted');
     }
 
     function openSearch() {
@@ -5202,6 +5406,11 @@
             if (numOsdEl) {
                 numOsdEl.classList.remove('visible');
             }
+            var fastMatch = channelByNumMap[String(targetNum)];
+            if (fastMatch) {
+                playItem(fastMatch);
+                return;
+            }
             for (var i = 0; i < allChannels.length; i++) {
                 if (Number(allChannels[i].num) === targetNum) {
                     playItem(allChannels[i]);
@@ -5397,6 +5606,7 @@
                     updateSettingsFocus();
                 } else if (isEnter) {
                     if (focusedEl === selProfileEl) {
+                        saveCurrentInputsToEditingProfile();
                         var nextProfIdx = (editingProfileIndex + 1) % profiles.length;
                         loadProfileIntoSettingsInputs(nextProfIdx);
                     } else if (focusedEl === selThemeEl) {
@@ -5766,9 +5976,19 @@
                     catIdx = (catIdx - 1 + currentCats.length) % currentCats.length;
                     renderCats();
                 } else if (activeCol === 'items' && currentItems.length > 0) {
+                    var nowUpMs = Date.now();
+                    var isFastRepeatUp = (nowUpMs - lastKeyRepeatTime) < 80;
+                    lastKeyRepeatTime = nowUpMs;
                     itemIdx = Math.max(0, itemIdx - 1);
                     renderItems();
-                    updatePreviewPanel();
+                    if (!isFastRepeatUp) {
+                        updatePreviewPanel();
+                    } else {
+                        if (previewDebounceTimer) {
+                            clearTimeout(previewDebounceTimer);
+                        }
+                        previewDebounceTimer = setTimeout(updatePreviewPanel, 120);
+                    }
                 } else if (activeCol === 'info' && quickActionButtons.length > 0) {
                     infoActionIdx = Math.max(0, infoActionIdx - 2);
                     updateInfoActionsFocus();
@@ -5781,9 +6001,19 @@
                     catIdx = (catIdx + 1) % currentCats.length;
                     renderCats();
                 } else if (activeCol === 'items' && currentItems.length > 0) {
+                    var nowDownMs = Date.now();
+                    var isFastRepeatDown = (nowDownMs - lastKeyRepeatTime) < 80;
+                    lastKeyRepeatTime = nowDownMs;
                     itemIdx = Math.min(currentItems.length - 1, itemIdx + 1);
                     renderItems();
-                    updatePreviewPanel();
+                    if (!isFastRepeatDown) {
+                        updatePreviewPanel();
+                    } else {
+                        if (previewDebounceTimer) {
+                            clearTimeout(previewDebounceTimer);
+                        }
+                        previewDebounceTimer = setTimeout(updatePreviewPanel, 120);
+                    }
                     loadMoreCatalogIfNeeded();
                 } else if (activeCol === 'info' && quickActionButtons.length > 0) {
                     infoActionIdx = Math.min(quickActionButtons.length - 1, infoActionIdx + 2);
